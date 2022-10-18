@@ -1,0 +1,134 @@
+version: '3.7'
+services:
+  private1:
+    build:
+      target: user
+    hostname: private1
+    cap_add:
+      - NET_ADMIN
+    networks:
+      A_private:
+        ipv4_address: 192.168.233.101
+    entrypoint:
+      - /bin/sh
+      - -cx
+      - |
+        ip route del default
+        ip route add default via 192.168.233.1
+        tail -f
+  private2:
+    build:
+      target: user
+    hostname: private2
+    cap_add:
+      - NET_ADMIN
+    networks:
+      A_private:
+        ipv4_address: 192.168.233.102
+    entrypoint:
+      - /bin/sh
+      - -cx
+      - |
+        ip route del default
+        ip route add default via 192.168.233.1
+        tail -f
+  server1:
+    build:
+      target: server
+    hostname: server1
+    cap_add:
+      - NET_ADMIN
+    networks:
+      B_dmz:
+        ipv4_address: 192.168.234.11
+    volumes:
+      - ./www:/var/www/html
+    entrypoint:
+      - /bin/sh
+      - -cx
+      - |
+        ip route del default
+        ip route add default via 192.168.234.1
+        apache2-foreground
+  server2:
+    build:
+      target: server
+    hostname: server2
+    cap_add:
+      - NET_ADMIN
+    networks:
+      B_dmz:
+        ipv4_address: 192.168.234.12
+    volumes:
+      - ./www:/var/www/html
+    entrypoint:
+      - /bin/sh
+      - -cx
+      - |
+        ip route del default
+        ip route add default via 192.168.234.1
+        apache2-foreground
+  firewall:
+    build:
+      target: yafw
+    hostname: firewall
+    sysctls:
+      - net.ipv4.ip_forward=1
+      - net.ipv4.conf.all.forwarding=1
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+      - SYS_ADMIN
+      - SYSLOG
+    networks:
+      A_private:
+        ipv4_address: 192.168.233.1
+      B_dmz:
+        ipv4_address: 192.168.234.1
+      C_public:
+        ipv4_address: 100.54.229.55
+    ports:
+      - 9085:9085
+    volumes:
+      - ../bin:/app
+    entrypoint: tail -f
+  router1:
+    build:
+      target: user
+    hostname: router1
+    networks:
+      C_public:
+        ipv4_address: 100.248.45.127
+    entrypoint: tail -f
+  router2:
+    build:
+      target: user
+    hostname: router2
+    networks:
+      C_public:
+        ipv4_address: 100.71.48.241
+    entrypoint: tail -f
+
+# network names are having a capitalized letter as the prefix, since NIC orders
+# can be only interfered via this way.
+networks:
+  A_private:
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: 192.168.233.0/24
+          gateway: 192.168.233.254
+  B_dmz:
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: 192.168.234.0/24
+          gateway: 192.168.234.254
+  C_public:
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: 100.0.0.0/8

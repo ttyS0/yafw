@@ -1,0 +1,46 @@
+#!/bin/sh
+
+help_and_exit() {
+    cat << EOF
+Usage: $0 NAME [PREFIX]
+                                     Naming things is hard, so is IP allocation.
+
+Generate an IP address from name and a prefix.
+
+Example:
+    > $0 foo 10.1
+    10.1.172.189
+    > $0 bar 192.168.1
+    192.168.1.55
+EOF
+    exit 1
+}
+
+name="$1"
+
+prefix="$2"
+if [ ! -z "$prefix" ]; then
+    prefix="${prefix%.}."
+fi
+
+dots=$(echo "$prefix" | grep -oF . | wc -l)
+segs=$((4 - $dots))
+
+if [ -z "$name" ]; then
+    help_and_exit
+fi
+
+ip="$prefix"
+hash=$(echo -n "$name" | md5sum)
+
+for i in $(seq $segs); do
+    byte="${hash:0:2}"
+    hash="${hash:2}"
+    if [ "$i" != 1 ]; then
+        ip="$ip."
+    fi
+    current=$(printf '%d' 0x$byte)
+    ip="$ip$current"
+done
+
+echo "$ip"
