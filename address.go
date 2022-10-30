@@ -84,6 +84,21 @@ func (r *Address) MarshalJSON() ([]byte, error) {
 	}
 }
 
+func (r *Address) String() string {
+	switch r.Type() {
+	case AddressIPSet:
+		return fmt.Sprintf("ipset:%s", r.IPSet)
+	case AddressImmediate:
+		ipranges := []string{}
+		for _, iprange := range r.Immediate {
+			ipranges = append(ipranges, iprange.String())
+		}
+		return fmt.Sprintf("[%s]", strings.Join(ipranges, ","))
+	default:
+		return "(unknown)"
+	}
+}
+
 type IPSet struct {
 	set *nftables.Set
 
@@ -227,15 +242,15 @@ func (r *Router) MakeImmediateAddress(address *Address) (*nftables.Set, error) {
 	nft := r.nft
 
 	set := &nftables.Set{
-		Table:     r.table,
-		Interval:  true,
-		Anonymous: true,
-		Constant:  true,
-		KeyType:   nftables.TypeIPAddr,
+		Table:         r.table,
+		Concatenation: true,
+		Interval:      true,
+		Anonymous:     true,
+		Constant:      true,
+		KeyType:       nftables.TypeIPAddr,
 	}
 
-	err := nft.AddSet(set, setElementsFromIPRanges(address.Immediate))
-	if err != nil {
+	if err := nft.AddSet(set, setElementsFromIPRanges(address.Immediate)); err != nil {
 		return nil, err
 	}
 

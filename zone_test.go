@@ -9,7 +9,7 @@ import (
 func TestZone(t *testing.T) {
 	router := newTestRouter()
 
-	zone := router.NewZone("trust")
+	zone := router.zones.AddZone("trust")
 
 	// other interfaces will not be available since the test is now under a
 	// new network namespace.
@@ -25,7 +25,7 @@ func TestZone(t *testing.T) {
 		zone.AddInterface(iface)
 	}
 
-	router.UpdateZone(zone)
+	router.zones.Update(zone)
 
 	out, err := exec.Command("nft", "-j", "list", "set", "ip", "yafw", zone.set.Name).CombinedOutput()
 	t.Logf("NFT Output:\n%s\n", out)

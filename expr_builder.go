@@ -167,6 +167,7 @@ func (eb *ExprBuilder) LookupSet(register uint32, set *nftables.Set) *ExprBuilde
 		return eb.Append(
 			&expr.Lookup{
 				SourceRegister: register,
+				SetName:        set.Name,
 				SetID:          set.ID,
 			},
 		)

@@ -16,44 +16,6 @@ type Zone struct {
 	m    map[string]*net.Interface
 }
 
-func (r *Router) NewZone(name string) *Zone {
-	found := r.FindZone(name)
-
-	if found != nil {
-		return nil
-	}
-
-	ret := &Zone{
-		Name: name,
-		m:    make(map[string]*net.Interface),
-	}
-	r.zones[name] = ret
-
-	return ret
-}
-
-func (r *Router) FindZone(name string) *Zone {
-	zone, ok := r.zones[name]
-	if ok {
-		return zone
-	} else {
-		return nil
-	}
-}
-
-func (r *Router) Zones(name string) []*Zone {
-	ret := []*Zone{}
-	for _, z := range r.zones {
-		ret = append(ret, z)
-		return ret
-	}
-	return ret
-}
-
-func (r *Router) DeleteZone(name string) {
-	delete(r.zones, name)
-}
-
 func (z *Zone) element(member *net.Interface) []nftables.SetElement {
 	ret := []nftables.SetElement{
 		{
@@ -75,7 +37,43 @@ func (z *Zone) elements() []nftables.SetElement {
 	return ret
 }
 
-func (r *Router) UpdateZone(zone *Zone) error {
+func (z *Zone) AddInterface(iface *net.Interface) *Zone {
+	_, ok := z.m[iface.Name]
+	if !ok {
+		z.m[iface.Name] = iface
+	}
+	return z
+}
+
+func (z *Zone) RemoveInterface(iface *net.Interface) *Zone {
+	delete(z.m, iface.Name)
+	return z
+}
+
+func (z *Zone) Members() []*net.Interface {
+	ret := make([]*net.Interface, 0)
+	for _, member := range z.m {
+		ret = append(ret, member)
+	}
+	return ret
+}
+
+type ZoneTable struct {
+	r            *Router
+	zoneMap      map[string]*Zone  // zone name to zone data
+	interfaceMap map[string]string // interface name to zone name
+}
+
+func NewZoneTable(r *Router) *ZoneTable {
+	return &ZoneTable{
+		r:            r,
+		zoneMap:      make(map[string]*Zone),
+		interfaceMap: make(map[string]string),
+	}
+}
+
+func (t *ZoneTable) Update(zone *Zone) error {
+	r := t.r
 	nft := r.nft
 
 	if zone.set != nil {
@@ -114,9 +112,9 @@ func (r *Router) UpdateZone(zone *Zone) error {
 		return err
 	}
 
-	zone, ok := r.zones[zone.Name]
+	zone, ok := t.zoneMap[zone.Name]
 	if !ok {
-		r.zones[zone.Name] = zone
+		t.zoneMap[zone.Name] = zone
 	}
 
 	zone.oldM = zone.m
@@ -124,23 +122,58 @@ func (r *Router) UpdateZone(zone *Zone) error {
 	return nil
 }
 
-func (z *Zone) AddInterface(iface *net.Interface) *Zone {
-	_, ok := z.m[iface.Name]
-	if !ok {
-		z.m[iface.Name] = iface
+func (t *ZoneTable) FindZone(name string) *Zone {
+	if zone, ok := t.zoneMap[name]; ok {
+		return zone
+	} else {
+		return nil
 	}
-	return z
 }
 
-func (z *Zone) RemoveInterface(iface *net.Interface) *Zone {
-	delete(z.m, iface.Name)
-	return z
-}
-
-func (z *Zone) Members() []*net.Interface {
-	ret := make([]*net.Interface, 0)
-	for _, member := range z.m {
-		ret = append(ret, member)
+func (r *ZoneTable) All() []*Zone {
+	ret := []*Zone{}
+	for _, z := range r.zoneMap {
+		ret = append(ret, z)
+		return ret
 	}
 	return ret
+}
+
+func (t *ZoneTable) AssignInterfaceToZone(iface *net.Interface, zone string) error {
+	if oldZone, ok := t.interfaceMap[iface.Name]; ok {
+		if oldZone != zone {
+			t.zoneMap[oldZone].RemoveInterface(iface)
+			t.Update(t.zoneMap[oldZone])
+		}
+	}
+
+	t.zoneMap[zone].AddInterface(iface)
+	t.interfaceMap[iface.Name] = zone
+	t.Update(t.zoneMap[zone])
+
+	return nil
+}
+
+func (t *ZoneTable) DeleteZone(name string) {
+	if zone, ok := t.zoneMap[name]; ok {
+		for _, iface := range zone.Members() {
+			delete(t.interfaceMap, iface.Name)
+		}
+
+		delete(t.zoneMap, name)
+	}
+}
+
+func (t *ZoneTable) AddZone(name string) *Zone {
+	z := &Zone{
+		Name:        name,
+		Description: "",
+		oldM:        make(map[string]*net.Interface),
+		m:           make(map[string]*net.Interface),
+		set:         nil,
+	}
+
+	t.zoneMap[name] = z
+
+	return z
 }

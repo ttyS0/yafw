@@ -2,7 +2,6 @@ package yafw
 
 import (
 	"encoding/json"
-	"fmt"
 
 	"github.com/google/nftables"
 	"github.com/google/nftables/expr"
@@ -79,23 +78,23 @@ func (r *Router) Policies() (ret []*Policy) {
 func (policy *Policy) buildArtifact(router *Router) error {
 	artifact := &PolicyArtifact{}
 
-	if policy.SourceZone != "" {
-		zone := router.FindZone(policy.SourceZone)
-		if zone != nil {
-			artifact.SourceZone = zone.set
-		} else {
-			return fmt.Errorf("zone \"%s\" not found", policy.SourceZone)
-		}
-	}
+	// if policy.SourceZone != "" {
+	// 	zone := router.zones.FindZone(policy.SourceZone)
+	// 	if zone != nil {
+	// 		artifact.SourceZone = zone.set
+	// 	} else {
+	// 		return fmt.Errorf("zone \"%s\" not found", policy.SourceZone)
+	// 	}
+	// }
 
-	if policy.DestinationZone != "" {
-		zone := router.FindZone(policy.DestinationZone)
-		if zone != nil {
-			artifact.DestinationZone = zone.set
-		} else {
-			return fmt.Errorf("zone \"%s\" not found", policy.DestinationZone)
-		}
-	}
+	// if policy.DestinationZone != "" {
+	// 	zone := router.zones.FindZone(policy.DestinationZone)
+	// 	if zone != nil {
+	// 		artifact.DestinationZone = zone.set
+	// 	} else {
+	// 		return fmt.Errorf("zone \"%s\" not found", policy.DestinationZone)
+	// 	}
+	// }
 
 	if policy.Source != nil {
 		set, err := router.addressToSet(policy.Source)
@@ -131,25 +130,21 @@ func (policy *Policy) ToRules() []*nftables.Rule {
 	artifact := policy.artifact
 
 	if artifact != nil {
-		if policy.DestinationZone != "" {
-			builder.MetaIngressInterface(1).LookupSet(1, artifact.DestinationZone)
-		}
-
-		if policy.SourceZone != "" {
+		if policy.SourceZone != "" && artifact.SourceZone != nil {
 			builder.MetaIngressInterface(1).LookupSet(1, artifact.SourceZone)
 		}
 
-		if policy.DestinationZone != "" {
+		if policy.DestinationZone != "" && artifact.DestinationZone != nil {
 			builder.MetaIngressInterface(1).LookupSet(1, artifact.DestinationZone)
 		}
 
-		if policy.Source != nil {
+		if policy.Source != nil && artifact.Source != nil {
 			builder.PayloadIPSource(1).LookupSet(1, artifact.Source)
 		}
-	}
 
-	if policy.Destination != nil && artifact.Destination != nil {
-		builder.PayloadIPDestination(1).LookupSet(1, artifact.Destination)
+		if policy.Destination != nil && artifact.Destination != nil {
+			builder.PayloadIPDestination(1).LookupSet(1, artifact.Destination)
+		}
 	}
 
 	if policy.Service != nil {

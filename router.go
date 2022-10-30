@@ -28,7 +28,7 @@ type Router struct {
 	postrouting *nftables.Chain
 	prerouting  *nftables.Chain
 
-	zones  map[string]*Zone
+	zones  *ZoneTable
 	ipsets map[string]*IPSet
 	// serviceGroups map[string]*ServiceGroup
 
@@ -333,7 +333,6 @@ func NewRouterNS(ns netns.NsHandle) (*Router, error) {
 		nl:     nl,
 		ct:     ct,
 		ipsets: make(map[string]*IPSet),
-		zones:  make(map[string]*Zone),
 	}
 
 	ret.initNftables()
@@ -341,6 +340,7 @@ func NewRouterNS(ns netns.NsHandle) (*Router, error) {
 	ret.snatEntries = NewEntryTable(ret, ret.postrouting, &SNATRule{})
 	ret.dnatEntries = NewEntryTable(ret, ret.prerouting, &DNATRule{})
 	ret.policyEntries = NewEntryTable(ret, ret.forward, &Policy{})
+	ret.zones = NewZoneTable(ret)
 
 	return ret, nil
 }
